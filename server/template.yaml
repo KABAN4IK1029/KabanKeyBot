@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Kaban Key Bot — Lambda + DynamoDB инфраструктура
+
+Parameters:
+  TableKeysName:
+    Type: String
+    Default: kaban_keys
+    Description: Имя таблицы ключей
+  TableUsersName:
+    Type: String
+    Default: kaban_users
+    Description: Имя таблицы пользователей
+  TableSettingsName:
+    Type: String
+    Default: kaban_settings
+    Description: Имя таблицы настроек
+
+Resources:
+  # ========================================================================
+  # DynamoDB таблицы
+  # ========================================================================
+  DynamoTableKeys:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableKeysName
+      AttributeDefinitions:
+        - AttributeName: key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: key
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  DynamoTableUsers:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableUsersName
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  DynamoTableSettings:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableSettingsName
+      AttributeDefinitions:
+        - AttributeName: setting_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: setting_key
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # ========================================================================
+  # Lambda: generate_key
+  # ========================================================================
+  GenerateKeyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kaban-generate-key
+      CodeUri: functions/generate_key/
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoTableKeys
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoTableSettings
+      Environment:
+        Variables:
+          TABLE_KEYS: !Ref DynamoTableKeys
+          TABLE_SETTINGS: !Ref DynamoTableSettings
+
+  # ========================================================================
+  # Lambda: validate_key
+  # ========================================================================
+  ValidateKeyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kaban-validate-key
+      CodeUri: functions/validate_key/
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoTableKeys
+      Environment:
+        Variables:
+          TABLE_KEYS: !Ref DynamoTableKeys
+
+  # ========================================================================
+  # Lambda: activate_key
+  # ========================================================================
+  ActivateKeyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kaban-activate-key
+      CodeUri: functions/activate_key/
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoTableKeys
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoTableUsers
+      Environment:
+        Variables:
+          TABLE_KEYS: !Ref DynamoTableKeys
+          TABLE_USERS: !Ref DynamoTableUsers
+
+  # ========================================================================
+  # Lambda: set_prefix
+  # ========================================================================
+  SetPrefixFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kaban-set-prefix
+      CodeUri: functions/set_prefix/
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoTableSettings
+      Environment:
+        Variables:
+          TABLE_SETTINGS: !Ref DynamoTableSettings
+
+  # ========================================================================
+  # Lambda: get_stats
+  # ========================================================================
+  GetStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kaban-get-stats
+      CodeUri: functions/get_stats/
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DynamoTableKeys
+        - DynamoDBReadPolicy:
+            TableName: !Ref DynamoTableUsers
+      Environment:
+        Variables:
+          TABLE_KEYS: !Ref DynamoTableKeys
+          TABLE_USERS: !Ref DynamoTableUsers
+
+  # ========================================================================
+  # Выводы
+  # ========================================================================
+  Outputs:
+    TableKeysName:
+      Description: Имя таблицы ключей
+      Value: !Ref DynamoTableKeys
+    TableUsersName:
+      Description: Имя таблицы пользователей
+      Value: !Ref DynamoTableUsers
+    TableSettingsName:
+      Description: Имя таблицы настроек
+      Value: !Ref DynamoTableSettings
